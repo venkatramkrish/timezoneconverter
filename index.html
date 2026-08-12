@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Timeband</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Timeband">
+<meta name="theme-color" content="#E7EBEA">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#E7EBEA; --card:#FFFFFF; --ink:#101C26; --muted:#65767F;
+    --line:rgba(16,28,38,.10);
+    --sleep:#1F3350; --open:#C6D0D3; --work:#E8A33D;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+    --disp:"Bricolage Grotesque","Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{background:var(--paper);color:var(--ink);font-family:var(--disp);font-size:16px;line-height:1.35;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);}
+  .app{max-width:620px;margin:0 auto;padding:14px 14px 34px}
+  #crash{display:none;background:#3B1111;color:#FFD9D9;font-family:var(--mono);font-size:12px;
+    padding:12px;border-radius:10px;margin-bottom:12px;white-space:pre-wrap;word-break:break-word}
+
+  header{display:flex;align-items:center;gap:8px;padding:2px 2px 12px}
+  .logo{font-weight:800;font-size:19px;letter-spacing:-.02em}
+  .hfill{flex:1}
+  .mini{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.08em;
+    border:1px solid var(--line);background:var(--card);color:var(--ink);
+    border-radius:999px;padding:6px 11px;cursor:pointer;}
+
+  .control{background:var(--card);border-radius:14px;padding:14px;
+    box-shadow:0 1px 0 rgba(16,28,38,.05),0 8px 24px -18px rgba(16,28,38,.5);}
+  .clabel{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--muted);display:flex;align-items:center;gap:7px;margin-bottom:10px;}
+  .clabel b{color:var(--ink);font-weight:600;letter-spacing:.06em}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex:none}
+  .dot.live{background:#2E9E6B}
+  .fields{display:flex;gap:8px}
+  input[type=date],input[type=time]{font-family:var(--mono);font-size:16px;font-weight:500;color:var(--ink);
+    background:var(--paper);border:1px solid transparent;border-radius:10px;padding:11px 10px;
+    min-width:0;flex:1;-webkit-appearance:none;appearance:none;}
+  input[type=time]{flex:0 0 42%}
+  input:focus{outline:none;border-color:var(--ink)}
+  .nudges{display:flex;gap:6px;margin-top:9px}
+  .nudge{flex:1;font-family:var(--mono);font-size:12.5px;font-weight:500;background:var(--paper);
+    border:1px solid transparent;color:var(--ink);border-radius:9px;padding:9px 0;cursor:pointer;}
+  .nudge.now{background:var(--ink);color:var(--card);flex:0 0 64px}
+
+  .scale{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9.5px;
+    color:var(--muted);letter-spacing:.06em;padding:15px 2px 5px}
+
+  .row{background:var(--card);border-radius:14px;padding:9px 11px 11px;margin-bottom:6px;
+    box-shadow:0 1px 0 rgba(16,28,38,.05);position:relative;}
+  .row.src{box-shadow:0 0 0 1.5px var(--ink),0 1px 0 rgba(16,28,38,.05)}
+  .rowhead{display:flex;align-items:center;gap:7px;margin-bottom:7px}
+  .anchor{width:16px;height:16px;flex:none;border-radius:50%;border:1.5px solid rgba(16,28,38,.3);
+    background:none;padding:0;cursor:pointer;position:relative}
+  .row.src .anchor{border-color:var(--ink)}
+  .row.src .anchor:after{content:"";position:absolute;top:3px;left:3px;width:7px;height:7px;
+    border-radius:50%;background:var(--ink)}
+  .city{font-family:var(--disp);font-weight:700;font-size:16px;letter-spacing:-.01em;background:none;
+    border:0;padding:0 2px 0 0;color:var(--ink);cursor:pointer;text-align:left;}
+  .city:after{content:" \25BE";font-size:10px;color:var(--muted)}
+  .stamp{margin-left:auto;display:flex;align-items:baseline;gap:6px;white-space:nowrap;
+    background:none;border:0;padding:0;cursor:pointer}
+  .t{font-family:var(--mono);font-size:15px;font-weight:600;letter-spacing:-.02em;color:var(--ink)}
+  .z{font-family:var(--mono);font-size:10.5px;font-weight:500;color:var(--muted);letter-spacing:.04em}
+  .diff{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--card);background:var(--ink);
+    border-radius:4px;padding:2px 4px}
+  .wk{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.06em}
+  .kill{position:absolute;top:4px;right:4px;width:24px;height:24px;border:0;background:none;
+    color:var(--muted);font-size:14px;line-height:1;cursor:pointer;opacity:.4;border-radius:50%}
+  .band{position:relative;height:30px;touch-action:none;cursor:ew-resize;-webkit-user-select:none;user-select:none}
+  .band svg{display:block;width:100%;height:30px;border-radius:6px;overflow:hidden}
+  .head{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink);pointer-events:none}
+  .head:after{content:"";position:absolute;top:-3px;left:-3px;width:8px;height:8px;background:var(--ink);border-radius:50%}
+
+  .actions{display:flex;gap:8px;margin-top:12px}
+  .btn{flex:1;font-family:var(--mono);font-size:12.5px;font-weight:600;letter-spacing:.05em;
+    border-radius:11px;padding:13px 0;cursor:pointer;border:1px solid var(--line);
+    background:var(--card);color:var(--ink);}
+  .btn.solid{background:var(--ink);color:var(--card);border-color:var(--ink)}
+  .btn.ghost{border-style:dashed;background:none;color:var(--muted)}
+
+  .legend{display:flex;gap:14px;justify-content:center;margin-top:14px;font-family:var(--mono);
+    font-size:10px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
+  .legend span{display:flex;align-items:center;gap:5px}
+  .sw{width:10px;height:10px;border-radius:2px;display:inline-block}
+
+  .sheet{position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(16,28,38,.45);
+    display:none;align-items:flex-end;justify-content:center;z-index:30}
+  .sheet.open{display:flex}
+  .sheetin{background:var(--card);width:100%;max-width:620px;border-radius:16px 16px 0 0;
+    padding:16px 14px calc(16px + env(safe-area-inset-bottom));max-height:84vh;display:flex;flex-direction:column}
+  .sheetin h2{font-size:17px;font-weight:700;margin:0 0 4px}
+  .fl{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--muted);margin:12px 0 6px}
+  .inp{font-family:var(--disp);font-size:16px;background:var(--paper);border:1px solid transparent;
+    border-radius:10px;padding:11px 12px;width:100%;color:var(--ink)}
+  .inp:focus{outline:none;border-color:var(--ink)}
+  .presets{display:flex;flex-wrap:wrap;gap:6px}
+  .pz{flex:0 0 calc(25% - 5px);background:var(--paper);border:1px solid transparent;border-radius:10px;
+    padding:8px 4px;cursor:pointer;text-align:center;color:var(--ink)}
+  .pz b{display:block;font-family:var(--mono);font-size:12.5px;font-weight:600;letter-spacing:.03em}
+  .pz i{display:block;font-style:normal;font-size:9.5px;color:var(--muted);white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+  .pz.cur{background:var(--ink)}
+  .pz.cur b{color:var(--card)} .pz.cur i{color:rgba(255,255,255,.6)}
+  .list{overflow-y:auto;margin-top:6px;-webkit-overflow-scrolling:touch}
+  .opt{display:flex;width:100%;align-items:baseline;gap:8px;background:none;border:0;padding:12px 4px;
+    border-bottom:1px solid var(--line);cursor:pointer;text-align:left}
+  .opt b{font-family:var(--disp);font-weight:600;font-size:15.5px;color:var(--ink)}
+  .opt i{font-family:var(--mono);font-style:normal;font-size:11px;color:var(--muted);margin-left:auto}
+  .chips{display:flex;gap:6px}
+  .chip{flex:1;font-family:var(--mono);font-size:12.5px;background:var(--paper);border:1px solid transparent;
+    border-radius:9px;padding:10px 0;cursor:pointer;color:var(--ink)}
+  .chip.on{background:var(--ink);color:var(--card)}
+  .toast{position:fixed;left:50%;bottom:30px;margin-left:-80px;width:160px;text-align:center;
+    background:var(--ink);color:var(--card);font-family:var(--mono);font-size:12px;
+    padding:10px 0;border-radius:999px;opacity:0;pointer-events:none;transition:.2s;z-index:40}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="crash"></div>
+  <header>
+    <div class="logo">Timeband</div>
+    <div class="hfill"></div>
+    <span class="mini" id="net" style="display:none;background:#3B1111;color:#FFD9D9;border-color:transparent">OFFLINE</span>
+    <button class="mini" id="fmt">12H</button>
+    <button class="mini" id="acct">WORK</button>
+  </header>
+
+  <section class="control">
+    <div class="clabel"><span class="dot live" id="livedot"></span>Time in <b id="srcname">&mdash;</b></div>
+    <div class="fields">
+      <input type="date" id="date" aria-label="Date">
+      <input type="time" id="time" step="1800" aria-label="Time">
+    </div>
+    <div class="nudges">
+      <button class="nudge now" id="nowbtn">Now</button>
+      <button class="nudge" data-min="-60">-1h</button>
+      <button class="nudge" data-min="-30">-30</button>
+      <button class="nudge" data-min="30">+30</button>
+      <button class="nudge" data-min="60">+1h</button>
+    </div>
+  </section>
+
+  <div class="scale" id="scale"></div>
+  <section id="rows"></section>
+
+  <button class="btn ghost" id="add" style="width:100%;margin-top:2px">+ ADD TIME ZONE</button>
+
+  <div class="actions">
+    <button class="btn" id="copy">Copy</button>
+    <button class="btn solid" id="sched">Schedule</button>
+  </div>
+
+  <div class="legend">
+    <span><i class="sw" style="background:#1F3350"></i>asleep</span>
+    <span><i class="sw" style="background:#C6D0D3"></i>awake</span>
+    <span><i class="sw" style="background:#E8A33D"></i>work hours</span>
+  </div>
+</div>
+
+<div class="sheet" id="picker"><div class="sheetin">
+  <h2 id="pktitle">Add a time zone</h2>
+  <div class="fl">Common</div>
+  <div class="presets" id="presets"></div>
+  <div class="fl">Search all</div>
+  <input id="search" class="inp" placeholder="City or zone" autocomplete="off">
+  <div class="list" id="list"></div>
+</div></div>
+
+<div class="sheet" id="compose"><div class="sheetin">
+  <h2>New meeting</h2>
+  <div class="fl">Title</div>
+  <input id="mtitle" class="inp" value="Meeting">
+  <div class="fl">Duration</div>
+  <div class="chips" id="durs">
+    <button class="chip" data-d="15">15m</button>
+    <button class="chip on" data-d="30">30m</button>
+    <button class="chip" data-d="45">45m</button>
+    <button class="chip" data-d="60">60m</button>
+  </div>
+  <div class="fl">Attendees (optional)</div>
+  <input id="mto" class="inp" placeholder="a@x.com, b@y.com" autocomplete="off">
+  <div class="fl">When</div>
+  <div id="whenbox" style="font-family:var(--mono);font-size:12px;color:var(--muted);line-height:1.7;white-space:pre-line"></div>
+  <button class="btn solid" id="goapp" style="width:100%;margin-top:14px">OPEN OUTLOOK APP</button>
+  <div class="actions" style="margin-top:8px">
+    <button class="btn" id="dlics">.ics file</button>
+    <button class="btn" id="goout">Outlook web</button>
+  </div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+window.onerror=function(m,s,l,c){var e=document.getElementById("crash");
+  if(e){e.style.display="block";e.textContent="Error: "+m+" (line "+l+":"+c+")";}return false;};
+
+/* ---------- presets ---------- */
+var PRESETS=[
+["India","Asia/Kolkata"],["New York","America/New_York"],["Chicago","America/Chicago"],
+["San Francisco","America/Los_Angeles"],["London","Europe/London"],["Milan","Europe/Rome"],
+["Dubai","Asia/Dubai"],["Singapore","Asia/Singapore"],["Tokyo","Asia/Tokyo"],
+["Sydney","Australia/Sydney"],["Sao Paulo","America/Sao_Paulo"],["UTC","UTC"]];
+
+var CITY_DATA=[
+["Kolkata","Asia/Kolkata"],["Mumbai","Asia/Kolkata"],["Bengaluru","Asia/Kolkata"],
+["Delhi","Asia/Kolkata"],["Chennai","Asia/Kolkata"],["Hyderabad","Asia/Kolkata"],
+["Kochi","Asia/Kolkata"],["Pune","Asia/Kolkata"],["India","Asia/Kolkata"],
+["New York","America/New_York"],["Boston","America/New_York"],["Atlanta","America/New_York"],
+["Washington DC","America/New_York"],["Miami","America/New_York"],["Chicago","America/Chicago"],
+["Dallas","America/Chicago"],["Austin","America/Chicago"],["Denver","America/Denver"],
+["Phoenix","America/Phoenix"],["Los Angeles","America/Los_Angeles"],["San Francisco","America/Los_Angeles"],
+["Seattle","America/Los_Angeles"],["Toronto","America/Toronto"],["Vancouver","America/Vancouver"],
+["Mexico City","America/Mexico_City"],["Bogota","America/Bogota"],["Sao Paulo","America/Sao_Paulo"],
+["Buenos Aires","America/Argentina/Buenos_Aires"],["Honolulu","Pacific/Honolulu"],
+["London","Europe/London"],["Dublin","Europe/Dublin"],["Lisbon","Europe/Lisbon"],
+["Madrid","Europe/Madrid"],["Paris","Europe/Paris"],["Amsterdam","Europe/Amsterdam"],
+["Brussels","Europe/Brussels"],["Berlin","Europe/Berlin"],["Zurich","Europe/Zurich"],
+["Milan","Europe/Rome"],["Rome","Europe/Rome"],["Stockholm","Europe/Stockholm"],
+["Oslo","Europe/Oslo"],["Copenhagen","Europe/Copenhagen"],["Warsaw","Europe/Warsaw"],
+["Athens","Europe/Athens"],["Istanbul","Europe/Istanbul"],["Moscow","Europe/Moscow"],
+["Dubai","Asia/Dubai"],["Abu Dhabi","Asia/Dubai"],["Riyadh","Asia/Riyadh"],["Doha","Asia/Qatar"],
+["Tel Aviv","Asia/Jerusalem"],["Nairobi","Africa/Nairobi"],["Cairo","Africa/Cairo"],
+["Lagos","Africa/Lagos"],["Johannesburg","Africa/Johannesburg"],
+["Karachi","Asia/Karachi"],["Colombo","Asia/Colombo"],["Dhaka","Asia/Dhaka"],["Kathmandu","Asia/Kathmandu"],
+["Bangkok","Asia/Bangkok"],["Jakarta","Asia/Jakarta"],["Singapore","Asia/Singapore"],
+["Kuala Lumpur","Asia/Kuala_Lumpur"],["Manila","Asia/Manila"],["Hong Kong","Asia/Hong_Kong"],
+["Shanghai","Asia/Shanghai"],["Taipei","Asia/Taipei"],["Seoul","Asia/Seoul"],["Tokyo","Asia/Tokyo"],
+["Perth","Australia/Perth"],["Brisbane","Australia/Brisbane"],["Sydney","Australia/Sydney"],
+["Melbourne","Australia/Melbourne"],["Auckland","Pacific/Auckland"],["UTC","UTC"]];
+
+var ZMAP={"Europe/London":["GMT","BST"],"Europe/Dublin":["GMT","IST"],"Europe/Lisbon":["WET","WEST"],
+"Europe/Madrid":["CET","CEST"],"Europe/Paris":["CET","CEST"],"Europe/Amsterdam":["CET","CEST"],
+"Europe/Brussels":["CET","CEST"],"Europe/Berlin":["CET","CEST"],"Europe/Zurich":["CET","CEST"],
+"Europe/Rome":["CET","CEST"],"Europe/Stockholm":["CET","CEST"],"Europe/Oslo":["CET","CEST"],
+"Europe/Copenhagen":["CET","CEST"],"Europe/Warsaw":["CET","CEST"],"Europe/Athens":["EET","EEST"],
+"Africa/Cairo":["EET","EEST"],"Asia/Jerusalem":["IST","IDT"],
+"Australia/Sydney":["AEST","AEDT"],"Australia/Melbourne":["AEST","AEDT"],
+"Pacific/Auckland":["NZST","NZDT"]};
+var ABBR={"Asia/Kolkata":"IST","Asia/Dubai":"GST","Asia/Karachi":"PKT","Asia/Dhaka":"BDT",
+"Asia/Colombo":"SLST","Asia/Kathmandu":"NPT","Asia/Bangkok":"ICT","Asia/Jakarta":"WIB",
+"Asia/Singapore":"SGT","Asia/Kuala_Lumpur":"MYT","Asia/Manila":"PHT","Asia/Qatar":"AST",
+"Asia/Riyadh":"AST","Africa/Nairobi":"EAT","Africa/Lagos":"WAT","Africa/Johannesburg":"SAST",
+"America/Bogota":"COT","America/Sao_Paulo":"BRT","America/Argentina/Buenos_Aires":"ART",
+"Europe/Moscow":"MSK","Europe/Istanbul":"TRT","Asia/Tokyo":"JST","Asia/Seoul":"KST",
+"Asia/Shanghai":"CST","Asia/Hong_Kong":"HKT","Asia/Taipei":"CST","Australia/Brisbane":"AEST",
+"Australia/Perth":"AWST","UTC":"UTC"};
+var MO=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+var STEP=1800000; /* 30 minutes */
+
+/* ---------- zone maths ---------- */
+var _f={};
+function fmtr(tz){
+  if(!_f[tz]){_f[tz]=new Intl.DateTimeFormat("en-GB",{timeZone:tz,hour12:false,
+    year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",weekday:"short"});}
+  return _f[tz];
+}
+function zparts(ms,tz){
+  var a=fmtr(tz).formatToParts(new Date(ms)),p={},i;
+  for(i=0;i<a.length;i++){p[a[i].type]=a[i].value;}
+  var h=parseInt(p.hour,10); if(isNaN(h)||h===24)h=0;
+  return {y:+p.year,mo:+p.month,d:+p.day,h:h,mi:+p.minute,s:+p.second||0,wd:p.weekday.slice(0,3)};
+}
+function offset(ms,tz){var p=zparts(ms,tz);return Date.UTC(p.y,p.mo-1,p.d,p.h,p.mi,p.s)-ms;}
+function toInstant(y,mo,d,h,mi,tz){
+  var g=Date.UTC(y,mo-1,d,h,mi),o1=offset(g,tz),t=g-o1,o2=offset(t,tz);
+  if(o2!==o1)t=g-o2; return t;
+}
+var _ab={};
+function abbr(ms,tz){
+  var k=tz+"|"+Math.floor(offset(ms,tz)/60000);
+  if(_ab[k])return _ab[k];
+  var s="";
+  try{var ps=new Intl.DateTimeFormat("en-US",{timeZone:tz,timeZoneName:"short"}).formatToParts(new Date(ms));
+    for(var i=0;i<ps.length;i++){if(ps[i].type==="timeZoneName")s=ps[i].value;}}catch(e){s="";}
+  if(!s||s.indexOf("GMT")===0||s.indexOf("UTC")===0){
+    if(ZMAP[tz]){
+      var yr=new Date(ms).getUTCFullYear();
+      var base=Math.min(offset(Date.UTC(yr,0,15),tz),offset(Date.UTC(yr,6,15),tz));
+      s=ZMAP[tz][offset(ms,tz)>base?1:0];
+    }else if(ABBR[tz]){s=ABBR[tz];}
+    else{var m=offset(ms,tz)/60000,sg=m<0?"-":"+",am=Math.abs(m);
+      s="UTC"+sg+Math.floor(am/60)+(am%60?":"+("0"+(am%60)).slice(-2):"");}
+  }
+  _ab[k]=s; return s;
+}
+function pad(n){return ("0"+n).slice(-2);}
+function clock(p){
+  if(!h12)return pad(p.h)+":"+pad(p.mi);
+  var ap=p.h<12?"am":"pm",h=p.h%12; if(h===0)h=12;
+  return h+":"+pad(p.mi)+" "+ap;
+}
+function dayNum(p){return Date.UTC(p.y,p.mo-1,p.d)/86400000;}
+function cat(p){
+  if(p.h<7||p.h>=22)return "sleep";
+  if(p.wd!=="Sat"&&p.wd!=="Sun"&&p.h>=9&&p.h<18)return "work";
+  return "open";
+}
+
+/* ---------- storage ---------- */
+function save(){try{localStorage.setItem("tb2",JSON.stringify({z:cities,n:names,h:h12,a:acct,s:src}));}catch(e){}}
+function load(){try{var s=localStorage.getItem("tb2");return s?JSON.parse(s):null;}catch(e){return null;}}
+
+/* ---------- state ---------- */
+var cities=["Asia/Kolkata","America/New_York"];
+var names={"Asia/Kolkata":"India","America/New_York":"New York"};
+var h12=true,acct="WORK",dur=30;
+var ld=load();
+if(ld&&ld.z&&ld.z.length){cities=ld.z;names=ld.n||names;h12=ld.h!==false;acct=ld.a||"WORK";}
+var src=(ld&&ld.s&&cities.indexOf(ld.s)!==-1)?ld.s:cities[0];
+var now=Math.round(Date.now()/STEP)*STEP;
+var live=true,win={s:0,e:0},pickIndex=-1;
+
+/* ---------- window ---------- */
+function setWindow(){
+  var p=zparts(now,src);
+  var s=toInstant(p.y,p.mo,p.d,0,0,src);
+  var nx=new Date(Date.UTC(p.y,p.mo-1,p.d+1));
+  var e=toInstant(nx.getUTCFullYear(),nx.getUTCMonth()+1,nx.getUTCDate(),0,0,src);
+  win={s:s,e:e};
+}
+function frac(t){var f=(t-win.s)/(win.e-win.s);return f<0?0:(f>1?1:f);}
+
+/* ---------- band ---------- */
+var FILL={sleep:"#1F3350",open:"#C6D0D3",work:"#E8A33D"};
+function bandSVG(tz){
+  var span=win.e-win.s,runs=[],flips=[],prev=null,pd=null,t,p,c,d,f0,f1,k;
+  for(t=win.s;t<win.e;t+=STEP){
+    p=zparts(t,tz);c=cat(p);d=dayNum(p);
+    f0=(t-win.s)/span;f1=(t+STEP-win.s)/span;if(f1>1)f1=1;
+    if(prev&&prev.c===c){prev.f1=f1;}else{prev={c:c,f0:f0,f1:f1};runs.push(prev);}
+    if(pd!==null&&d!==pd)flips.push({f:f0,wd:p.wd});
+    pd=d;
+  }
+  var g="";
+  for(k=0;k<runs.length;k++){
+    g+='<rect x="'+(runs[k].f0*1000).toFixed(2)+'" width="'+((runs[k].f1-runs[k].f0)*1000+0.6).toFixed(2)+'" y="0" height="40" fill="'+FILL[runs[k].c]+'"/>';
+  }
+  for(k=1;k<24;k++){
+    g+='<rect x="'+(k/24*1000).toFixed(2)+'" width="0.9" y="0" height="40" fill="rgba(255,255,255,0.16)"/>';
+  }
+  for(k=0;k<flips.length;k++){
+    g+='<rect x="'+(flips[k].f*1000).toFixed(2)+'" width="1.8" y="0" height="40" fill="#ffffff"/>';
+    g+='<text x="'+(flips[k].f*1000+8).toFixed(2)+'" y="14" fill="#ffffff" font-size="10" font-weight="600" opacity="0.85">'+flips[k].wd+'</text>';
+  }
+  return '<svg viewBox="0 0 1000 40" preserveAspectRatio="none">'+g+'</svg>';
+}
+
+/* ---------- render ---------- */
+function $(i){return document.getElementById(i);}
+var rowsEl;
+
+function renderAll(){
+  setWindow();
+  rowsEl.innerHTML="";
+  for(var n=0;n<cities.length;n++){
+    (function(tz,idx){
+      var row=document.createElement("div");
+      row.className="row"+(tz===src?" src":"");
+      var h='<div class="rowhead">'
+        +'<button class="anchor" title="Set input zone"></button>'
+        +'<button class="city">'+names[tz]+'</button>'
+        +'<button class="stamp"></button></div>'
+        +'<div class="band">'+bandSVG(tz)+'<div class="head"></div></div>';
+      if(cities.length>1)h+='<button class="kill">&times;</button>';
+      row.innerHTML=h;
+      row.querySelector(".city").onclick=function(){openPicker(idx);};
+      row.querySelector(".anchor").onclick=function(){src=tz;live=false;save();renderAll();};
+      row.querySelector(".stamp").onclick=function(){src=tz;live=false;save();renderAll();};
+      var k=row.querySelector(".kill");
+      if(k)k.onclick=function(){
+        var out=[],j;
+        for(j=0;j<cities.length;j++){if(j!==idx)out.push(cities[j]);}
+        cities=out; if(cities.indexOf(src)===-1)src=cities[0];
+        save();renderAll();
+      };
+      bindDrag(row.querySelector(".band"));
+      rowsEl.appendChild(row);
+    })(cities[n],n);
+  }
+  $("add").style.display=cities.length<6?"block":"none";
+  renderScale();renderTimes();
+}
+function renderScale(){
+  var out=[],i,t;
+  for(i=0;i<=24;i+=6){
+    t=win.s+(win.e-win.s)*(i/24);
+    out.push("<span>"+clock({h:zparts(t,src).h,mi:0}).replace(":00","")+"</span>");
+  }
+  $("scale").innerHTML=out.join("");
+}
+function renderTimes(){
+  var sp=zparts(now,src),sd=dayNum(sp),f=frac(now),i;
+  $("srcname").textContent=names[src];
+  $("date").value=sp.y+"-"+pad(sp.mo)+"-"+pad(sp.d);
+  $("time").value=pad(sp.h)+":"+pad(sp.mi);
+  $("livedot").className="dot"+(live?" live":"");
+  for(i=0;i<cities.length;i++){
+    var tz=cities[i],row=rowsEl.children[i],p=zparts(now,tz),dd=dayNum(p)-sd;
+    row.querySelector(".stamp").innerHTML=
+      '<span class="wk">'+p.wd+'</span><span class="t">'+clock(p)+'</span>'
+      +'<span class="z">'+abbr(now,tz)+'</span>'
+      +(dd?'<span class="diff">'+(dd>0?"+":"-")+Math.abs(dd)+'d</span>':"");
+    row.querySelector(".head").style.left=(f*100)+"%";
+  }
+}
+
+/* ---------- interaction ---------- */
+function setInstant(t,keepLive){
+  now=Math.round(t/STEP)*STEP;
+  if(!keepLive)live=false;
+  if(now<win.s||now>=win.e){renderAll();}else{renderTimes();}
+}
+function bindDrag(el){
+  var on=false;
+  function at(x0){
+    var r=el.getBoundingClientRect(),x=x0-r.left;
+    if(x<0)x=0; if(x>r.width)x=r.width;
+    setInstant(win.s+(x/r.width)*(win.e-win.s));
+  }
+  if(window.PointerEvent){
+    el.addEventListener("pointerdown",function(e){on=true;try{el.setPointerCapture(e.pointerId);}catch(x){}at(e.clientX);e.preventDefault();});
+    el.addEventListener("pointermove",function(e){if(on)at(e.clientX);});
+    el.addEventListener("pointerup",function(){on=false;});
+    el.addEventListener("pointercancel",function(){on=false;});
+  }else{
+    el.addEventListener("touchstart",function(e){on=true;at(e.touches[0].clientX);e.preventDefault();},{passive:false});
+    el.addEventListener("touchmove",function(e){if(on)at(e.touches[0].clientX);e.preventDefault();},{passive:false});
+    el.addEventListener("touchend",function(){on=false;});
+    el.addEventListener("mousedown",function(e){on=true;at(e.clientX);});
+    window.addEventListener("mousemove",function(e){if(on)at(e.clientX);});
+    window.addEventListener("mouseup",function(){on=false;});
+  }
+}
+function readFields(){
+  var dv=$("date").value,tv=$("time").value;
+  if(!dv||!tv)return;
+  var a=dv.split("-"),b=tv.split(":");
+  var y=+a[0],mo=+a[1],d=+a[2],h=+b[0],mi=+b[1];
+  if(isNaN(y)||isNaN(h))return;
+  setInstant(toInstant(y,mo,d,h,mi,src));
+}
+
+/* ---------- picker ---------- */
+function openPicker(idx){
+  pickIndex=(typeof idx==="number")?idx:-1;
+  $("pktitle").textContent=pickIndex>=0?("Change "+names[cities[pickIndex]]):"Add a time zone";
+  $("search").value="";
+  renderPresets();fillList("");
+  $("picker").className="sheet open";
+}
+function choose(tz,nm){
+  names[tz]=nm;
+  if(pickIndex>=0){
+    var wasSrc=(cities[pickIndex]===src);
+    cities[pickIndex]=tz;
+    if(wasSrc)src=tz;
+  }else if(cities.indexOf(tz)===-1&&cities.length<6){
+    cities.push(tz);
+  }
+  save();$("picker").className="sheet";renderAll();
+}
+function renderPresets(){
+  var h="",i,cur=pickIndex>=0?cities[pickIndex]:null;
+  for(i=0;i<PRESETS.length;i++){
+    h+='<button class="pz'+(PRESETS[i][1]===cur?" cur":"")+'" data-tz="'+PRESETS[i][1]+'" data-c="'+PRESETS[i][0]+'">'
+      +'<b>'+abbr(now,PRESETS[i][1])+'</b><i>'+PRESETS[i][0]+'</i></button>';
+  }
+  $("presets").innerHTML=h;
+  var b=$("presets").querySelectorAll(".pz");
+  for(i=0;i<b.length;i++){
+    b[i].onclick=function(){choose(this.getAttribute("data-tz"),this.getAttribute("data-c"));};
+  }
+}
+function fillList(q){
+  q=(q||"").trim().toLowerCase();
+  var out=[],i,c;
+  for(i=0;i<CITY_DATA.length&&out.length<70;i++){
+    c=CITY_DATA[i];
+    if(!q||c[0].toLowerCase().indexOf(q)!==-1||c[1].toLowerCase().indexOf(q)!==-1
+       ||abbr(now,c[1]).toLowerCase().indexOf(q)!==-1){
+      out.push('<button class="opt" data-tz="'+c[1]+'" data-c="'+c[0]+'"><b>'+c[0]+'</b><i>'+abbr(now,c[1])+'</i></button>');
+    }
+  }
+  $("list").innerHTML=out.length?out.join(""):'<div style="padding:16px 4px;color:#65767F;font-size:13px">No match</div>';
+  var b=$("list").querySelectorAll(".opt");
+  for(i=0;i<b.length;i++){
+    b[i].onclick=function(){choose(this.getAttribute("data-tz"),this.getAttribute("data-c"));};
+  }
+}
+
+/* ---------- scheduling ---------- */
+function isoZ(ms){var d=new Date(ms);
+  return d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1)+"-"+pad(d.getUTCDate())+"T"+pad(d.getUTCHours())+":"+pad(d.getUTCMinutes())+":00Z";}
+function icsStamp(ms){var d=new Date(ms);
+  return ""+d.getUTCFullYear()+pad(d.getUTCMonth()+1)+pad(d.getUTCDate())+"T"+pad(d.getUTCHours())+pad(d.getUTCMinutes())+"00Z";}
+function zoneLines(){
+  var out=[],i;
+  for(i=0;i<cities.length;i++){
+    var p=zparts(now,cities[i]);
+    out.push(names[cities[i]]+": "+p.wd+" "+p.d+" "+MO[p.mo-1]+", "+clock(p)+" "+abbr(now,cities[i]));
+  }
+  return out;
+}
+function outlookURL(){
+  var host=acct==="WORK"?"https://outlook.office.com":"https://outlook.live.com";
+  var to=$("mto").value.replace(/\s+/g,"");
+  var u=host+"/calendar/deeplink/compose?path=/calendar/action/compose&rru=addevent&allday=false"
+    +"&startdt="+encodeURIComponent(isoZ(now))
+    +"&enddt="+encodeURIComponent(isoZ(now+dur*60000))
+    +"&subject="+encodeURIComponent($("mtitle").value||"Meeting")
+    +"&body="+encodeURIComponent(zoneLines().join("\n"));
+  if(to)u+="&to="+encodeURIComponent(to);
+  return u;
+}
+/* Outlook mobile app scheme. Times are wall-clock in the phone's own zone,
+   since the app has no timeZone parameter. */
+function localWall(ms){
+  var tz="UTC";
+  try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC";}catch(e){}
+  var p=zparts(ms,tz);
+  return p.y+"-"+pad(p.mo)+"-"+pad(p.d)+"T"+pad(p.h)+":"+pad(p.mi)+":00";
+}
+function outlookAppURL(){
+  var to=$("mto").value.replace(/\s+/g,"");
+  var u="ms-outlook://events/new?title="+encodeURIComponent($("mtitle").value||"Meeting")
+    +"&start="+encodeURIComponent(localWall(now))
+    +"&end="+encodeURIComponent(localWall(now+dur*60000));
+  if(to)u+="&attendees="+encodeURIComponent(to);
+  return u;
+}
+function openOutlookApp(){
+  var t0=Date.now(),left=false;
+  function mark(){left=true;}
+  document.addEventListener("visibilitychange",mark);
+  window.addEventListener("pagehide",mark);
+  try{window.location.href=outlookAppURL();}catch(e){}
+  setTimeout(function(){
+    document.removeEventListener("visibilitychange",mark);
+    window.removeEventListener("pagehide",mark);
+    if(!left&&!document.hidden&&Date.now()-t0<2500){
+      toast("App didn't open");
+    }
+  },1400);
+}
+function makeICS(){
+  return ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Timeband//EN","CALSCALE:GREGORIAN","METHOD:PUBLISH",
+    "BEGIN:VEVENT","UID:tb"+now+"@timeband","DTSTAMP:"+icsStamp(Date.now()),
+    "DTSTART:"+icsStamp(now),"DTEND:"+icsStamp(now+dur*60000),
+    "SUMMARY:"+($("mtitle").value||"Meeting"),
+    "DESCRIPTION:"+zoneLines().join("\\n"),"END:VEVENT","END:VCALENDAR"].join("\r\n");
+}
+function toast(m){var t=$("toast");t.textContent=m;t.className="toast show";
+  setTimeout(function(){t.className="toast";},1700);}
+
+/* ---------- boot ---------- */
+function boot(){
+  rowsEl=$("rows");
+  $("date").onchange=readFields; $("time").onchange=readFields;
+  $("date").oninput=readFields;  $("time").oninput=readFields;
+  $("nowbtn").onclick=function(){live=true;setInstant(Date.now(),true);};
+  var nb=document.querySelectorAll(".nudge[data-min]"),i;
+  for(i=0;i<nb.length;i++){
+    (function(b){b.onclick=function(){setInstant(now+parseInt(b.getAttribute("data-min"),10)*60000);};})(nb[i]);
+  }
+  $("fmt").textContent=h12?"12H":"24H";
+  $("acct").textContent=acct;
+  $("fmt").onclick=function(){h12=!h12;$("fmt").textContent=h12?"12H":"24H";save();renderScale();renderTimes();};
+  $("acct").onclick=function(){acct=acct==="WORK"?"PERSONAL":"WORK";$("acct").textContent=acct;save();};
+  $("add").onclick=function(){openPicker(-1);};
+  $("search").oninput=function(){fillList(this.value);};
+  $("picker").onclick=function(e){if(e.target===$("picker"))$("picker").className="sheet";};
+  $("compose").onclick=function(e){if(e.target===$("compose"))$("compose").className="sheet";};
+  var ch=$("durs").querySelectorAll(".chip");
+  for(i=0;i<ch.length;i++){
+    (function(b){b.onclick=function(){
+      dur=parseInt(b.getAttribute("data-d"),10);
+      var all=$("durs").querySelectorAll(".chip"),j;
+      for(j=0;j<all.length;j++)all[j].className="chip";
+      b.className="chip on";
+    };})(ch[i]);
+  }
+  $("sched").onclick=function(){$("whenbox").textContent=zoneLines().join("\n");$("compose").className="sheet open";};
+  $("goapp").onclick=openOutlookApp;
+  $("goout").onclick=function(){window.open(outlookURL(),"_blank");};
+  $("dlics").onclick=function(){
+    try{
+      var b=new Blob([makeICS()],{type:"text/calendar;charset=utf-8"});
+      var a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="meeting.ics";
+      document.body.appendChild(a);a.click();document.body.removeChild(a);
+    }catch(e){toast("Download blocked here");}
+  };
+  $("copy").onclick=function(){
+    var txt=zoneLines().join("\n");
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(txt).then(function(){toast("Copied");},function(){toast("Copy blocked");});
+    }else{toast("Copy blocked");}
+  };
+  setInterval(function(){if(live)setInstant(Date.now(),true);},20000);
+  setNet();
+  window.addEventListener("online",setNet);
+  window.addEventListener("offline",setNet);
+  registerSW();
+  renderAll();
+}
+/* ---------- offline ---------- */
+function setNet(){
+  var p=$("net");
+  if(!p)return;
+  if(navigator.onLine===false){p.textContent="OFFLINE";p.style.display="inline-block";}
+  else{p.style.display="none";}
+}
+function registerSW(){
+  if(!("serviceWorker" in navigator))return;
+  try{
+    navigator.serviceWorker.register("sw.js").then(function(reg){
+      if(!navigator.serviceWorker.controller){
+        navigator.serviceWorker.addEventListener("controllerchange",function(){
+          toast("Saved for offline");
+        });
+      }
+    }).catch(function(){});
+  }catch(e){}
+}
+
+try{
+  if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",boot);}else{boot();}
+}catch(err){
+  var c=document.getElementById("crash");
+  if(c){c.style.display="block";c.textContent="Startup failed: "+(err&&err.message?err.message:err);}
+}
+</script>
+</body>
+</html>
