@@ -1,6 +1,6 @@
 /* Timeband service worker
    Bump CACHE when you change index.html so phones pick up the new version. */
-var CACHE = "timeband-v1";
+var CACHE = "timeband-v2";
 
 var SHELL = [
   "./",
