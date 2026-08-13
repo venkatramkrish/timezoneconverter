@@ -101,43 +101,30 @@
   .vname{font-family:var(--disp);font-weight:700;font-size:13px;letter-spacing:-.01em;color:var(--ink);
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
   .vnrow{display:flex;align-items:center;gap:1px}
-  .vab{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.06em}
+  .vab{font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:.06em;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .vab b{color:var(--ink);font-weight:600}
   .vanchor{margin-bottom:4px}
-  .vwrap{display:flex;gap:7px;align-items:flex-start}
-  .vrail{position:relative;flex:0 0 26px;height:52vh;touch-action:none;cursor:ns-resize;
-    -webkit-user-select:none;user-select:none}
-  .vrail svg{display:block;width:100%;height:100%;border-radius:7px}
-  .vhead{position:absolute;left:-4px;right:-4px;height:2px;background:var(--ink);pointer-events:none}
-  .vhead:after{content:"";position:absolute;left:-4px;top:-3px;width:8px;height:8px;
+  .vtime{font-family:var(--mono);font-size:12.5px;letter-spacing:-.01em;margin-top:3px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .st{font-weight:600}
+  .sz,.sw{font-weight:500;opacity:.5;text-transform:uppercase}
+
+  /* Whole day visible, so the bands are draggable without fighting a scroll. */
+  .vstage{position:relative;display:flex;gap:5px;height:46vh;min-height:260px;
+    touch-action:none;-webkit-user-select:none;user-select:none;cursor:ns-resize}
+  .vband{position:relative;flex:1;min-width:0;border-radius:8px;overflow:hidden}
+  .vband svg{display:block;width:100%;height:100%}
+  .blab{position:absolute;left:5px;font-family:var(--mono);font-size:10px;font-weight:600;
+    letter-spacing:-.02em;transform:translateY(-50%);pointer-events:none;white-space:nowrap}
+  .blab.sleep{color:rgba(255,255,255,.75)}
+  .blab.open,.blab.work{color:var(--ink)}
+  .dflip{position:absolute;right:5px;font-family:var(--mono);font-size:9px;font-weight:600;
+    letter-spacing:.06em;color:#fff;opacity:.85;transform:translateY(-50%);pointer-events:none}
+  .vplay{position:absolute;left:-4px;right:-4px;height:2px;background:var(--ink);
+    pointer-events:none;z-index:3}
+  .vplay:after{content:"";position:absolute;left:-4px;top:-3px;width:8px;height:8px;
     border-radius:50%;background:var(--ink)}
-  .vgrid{flex:1;min-width:0;max-height:52vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
-    background:var(--card);border-radius:12px;padding:7px}
-  .slot{display:flex;gap:5px;cursor:pointer;position:relative}
-  .vcell{flex:1;min-width:0;height:22px;padding:0 7px;font-family:var(--mono);
-    font-size:11.5px;font-weight:500;display:flex;align-items:center;letter-spacing:-.01em}
-  .vcell.sleep{background:var(--sleep);color:rgba(255,255,255,.45)}
-  .vcell.open{background:var(--open);color:var(--ink)}
-  .vcell.work{background:var(--work);color:var(--ink)}
-  .vgrid .slot:first-child .vcell{border-radius:7px 7px 0 0}
-  .vgrid .slot:last-child .vcell{border-radius:0 0 7px 7px}
-  .vcell .dm{font-weight:500;opacity:.5;text-transform:uppercase;flex:0 0 auto;padding-left:4px}
-  .slot.hr .vcell{box-shadow:inset 0 1px 0 rgba(255,255,255,.4)}
-  .slot.sel{outline:2px solid var(--ink);border-radius:4px;z-index:2}
-  /* Row height must stay constant - every row is the same slice of time, so a
-     taller selected row would misrepresent the scale. */
-  /* Same padding and same type size as every other row, so the selected row's
-     text sits on exactly the same grid. Emphasis comes from weight and opacity,
-     never from size - mixing sizes puts the baselines at different heights. */
-  .slot.sel .vcell{padding:0 7px;gap:4px;white-space:nowrap;overflow:hidden}
-  /* Same reading order as the band view: weekday, time, zone - all left
-     aligned. Parts are dropped by width rather than being squeezed. */
-  .sgrp{display:flex;align-items:center;gap:4px;flex:1 1 auto;min-width:0;overflow:hidden}
-  .st{font-weight:600;flex:0 0 auto}
-  .sz{font-weight:500;opacity:.5;text-transform:uppercase;flex:0 1 auto;min-width:0;overflow:hidden}
-  .sw{font-weight:500;opacity:.5;text-transform:uppercase;flex:0 0 auto}
-  .slot.sel .vcell.sleep{color:#fff}
-  .vcell.bd{font-weight:600}
-  .vcell.bd.sleep{color:rgba(255,255,255,.8)}
 
   .actions{display:flex;gap:8px;margin-top:12px}
   .btn{flex:1;font-family:var(--mono);font-size:12.5px;font-weight:600;letter-spacing:.05em;
@@ -423,14 +410,18 @@ function bandSVG(tz){
   return '<svg viewBox="0 0 1000 40" preserveAspectRatio="none">'+g+'</svg>';
 }
 
-function railSVG(tz){
-  var span=win.e-win.s,runs=[],prev=null,t,p,c,f0,f1,k;
+function zoneRuns(tz){
+  var span=win.e-win.s,runs=[],prev=null,t,p,c,f0,f1;
   for(t=win.s;t<win.e;t+=SAMPLE){
     p=zparts(t,tz);c=cat(p);
     f0=(t-win.s)/span;f1=(t+SAMPLE-win.s)/span;if(f1>1)f1=1;
-    if(prev&&prev.c===c){prev.f1=f1;}else{prev={c:c,f0:f0,f1:f1};runs.push(prev);}
+    if(prev&&prev.c===c){prev.f1=f1;}
+    else{prev={c:c,f0:f0,f1:f1,t0:t};runs.push(prev);}
   }
-  var g="";
+  return runs;
+}
+function railSVG(tz){
+  var runs=zoneRuns(tz),g="",k;
   for(k=0;k<runs.length;k++){
     g+='<rect y="'+(runs[k].f0*1000).toFixed(2)+'" height="'+((runs[k].f1-runs[k].f0)*1000+0.6).toFixed(2)
       +'" x="0" width="40" fill="'+FILL[runs[k].c]+'"/>';
@@ -507,6 +498,19 @@ function renderAll(){
   renderTimes();
 }
 
+function stop(e){
+  if(e){if(e.stopPropagation)e.stopPropagation();if(e.preventDefault)e.preventDefault();}
+}
+function setAnchor(tz){
+  if(src===tz)return;
+  src=tz;live=false;listScrolled=false;save();renderAll();
+}
+function removeZone(tz){
+  var out=[],j;
+  for(j=0;j<cities.length;j++){if(cities[j]!==tz)out.push(cities[j]);}
+  cities=out; save(); renderAll();
+}
+
 function renderBands(){
   for(var n=0;n<disp.length;n++){
     (function(tz){
@@ -533,86 +537,59 @@ function renderBands(){
 }
 
 function renderList(){
-  var h='<div class="vcols">',i,t;
+  /* The whole day is on screen at once, so there is nothing to scroll and the
+     bands themselves can be dragged. Times live in the headers, not in the
+     bands, which keeps them readable at any height. */
+  var h='<div class="vcols">',i,k,tz,here;
   for(i=0;i<disp.length;i++){
-    var tz=disp[i],here=(cities.indexOf(tz)===-1);
+    tz=disp[i];here=(cities.indexOf(tz)===-1);
     h+='<div class="vcol'+(tz===src?" srccol":"")+'" data-tz="'+tz+'">'
       +'<span class="anchor vanchor"></span>'
       +'<div class="vnrow"><span class="vname">'+zoneName(tz)+'</span>'
       +(here?'':'<button class="chg" aria-label="Change zone">\u25BE</button>')+'</div>'
       +'<div class="vab">'+abbr(now,tz)+(here?" \u00B7 HERE":"")+'</div>'
-      +(!here&&cities.length>1?'<button class="kill">&times;</button>':'')
+      +'<div class="vtime"></div>'
+      +(!here&&cities.length>1?'<button class="kill">&times;</button>':"")
       +'</div>';
   }
-  /* No per-row labels. Each column marks only where its own day changes
-     character - waking, starting work, finishing, going to sleep - so the
-     column reads like a labelled band. Exact times come from the selection. */
-  /* The zone abbreviation already sits in the column header, so only repeat it
-     in the selected cell when the columns are wide enough to take it. On a
-     phone that is two columns; at three the time itself would start clipping. */
-  var showAb=(disp.length<=2);
-  var times=[],cats=[],bound=[],zi,ri,t0;
-  for(t0=win.s;t0<win.e;t0+=STEP)times.push(t0);
-  for(zi=0;zi<disp.length;zi++){
-    cats[zi]=[];bound[zi]=[];
-    for(ri=0;ri<times.length;ri++)cats[zi][ri]=cat(zparts(times[ri],disp[zi]));
-    for(ri=0;ri<times.length;ri++)bound[zi][ri]=(ri>0&&cats[zi][ri]!==cats[zi][ri-1]);
-  }
-  h+='</div><div class="vwrap"><div class="vrail" id="vrail">'+railSVG(src)
-    +'<div class="vhead" id="vhead"></div></div><div class="vgrid" id="vgrid">';
-  var ri0=-1;
-  for(t=win.s;t<win.e;t+=STEP){
-    ri0++;
-    var ap=zparts(t,src);
-    h+='<div class="slot'+(ap.mi===0?" hr":"")+'" data-t="'+t+'">';
-    for(i=0;i<disp.length;i++){
-      var p=zparts(t,disp[i]);
-      var full=clock(p);
-      /* Day rollovers are always marked, even on unlabelled rows. */
-      var mark=(p.h===0&&p.mi===0)?p.wd:"";
-      var show=bound[i][ri0]?full:"";
-      var dd=dayNum(p)-dayNum(ap);
-      h+='<div class="vcell '+cat(p)+(show?" bd":"")+'"'
-        +' data-full="'+full+'" data-base="'+show+'" data-mark="'+mark+'"'
-        +' data-dd="'+dd+'" data-wd="'+p.wd+'" data-ab="'+abbr(t,disp[i])+'">'
-        +'<span class="sgrp"><span class="st">'+show+'</span></span>'
-        +(mark?'<span class="dm">'+mark+'</span>':"")+'</div>';
+  h+='</div><div class="vstage" id="vstage">';
+  for(i=0;i<disp.length;i++){
+    tz=disp[i];
+    h+='<div class="vband">'+railSVG(tz);
+    var runs=zoneRuns(tz);
+    if(tz===src){
+      for(k=1;k<runs.length;k++){
+        h+='<span class="blab '+runs[k].c+'" style="top:'+(runs[k].f0*100).toFixed(3)+'%">'
+          +clock(zparts(runs[k].t0,tz))+'</span>';
+      }
+    }
+    var dprev=null,tt;
+    for(tt=win.s;tt<win.e;tt+=SAMPLE){
+      var pp=zparts(tt,tz),dn=dayNum(pp);
+      if(dprev!==null&&dn!==dprev){
+        h+='<span class="dflip" style="top:'+(((tt-win.s)/(win.e-win.s))*100).toFixed(3)+'%">'+pp.wd+'</span>';
+      }
+      dprev=dn;
     }
     h+='</div>';
   }
-  h+='</div></div>';
+  h+='<div class="vplay" id="vplay"></div></div>';
   rowsEl.innerHTML=h;
-  bindDragV($("vrail"));
+  bindDragV($("vstage"));
 
   var cols=rowsEl.querySelectorAll(".vcol");
   for(i=0;i<cols.length;i++){
     (function(col){
-      var tz=col.getAttribute("data-tz");
-      col.onclick=function(){setAnchor(tz);};
+      var t2=col.getAttribute("data-tz");
+      col.onclick=function(){setAnchor(t2);};
       var ch=col.querySelector(".chg");
-      if(ch)ch.onclick=function(e){stop(e);openPicker(cities.indexOf(tz));};
-      var k=col.querySelector(".kill");
-      if(k)k.onclick=function(e){stop(e);removeZone(tz);};
+      if(ch)ch.onclick=function(e){stop(e);openPicker(cities.indexOf(t2));};
+      var kk=col.querySelector(".kill");
+      if(kk)kk.onclick=function(e){stop(e);removeZone(t2);};
     })(cols[i]);
-  }
-  var slots=rowsEl.querySelectorAll(".slot");
-  for(i=0;i<slots.length;i++){
-    (function(s){s.onclick=function(){setInstant(parseInt(s.getAttribute("data-t"),10));};})(slots[i]);
   }
 }
 
-function stop(e){
-  if(e){if(e.stopPropagation)e.stopPropagation();if(e.preventDefault)e.preventDefault();}
-}
-function setAnchor(tz){
-  if(src===tz)return;
-  src=tz;live=false;listScrolled=false;save();renderAll();
-}
-function removeZone(tz){
-  var out=[],j;
-  for(j=0;j<cities.length;j++){if(cities[j]!==tz)out.push(cities[j]);}
-  cities=out; save(); renderAll();
-}
 function renderScale(){
   var out=[],i,t;
   for(i=0;i<=24;i+=6){
@@ -621,6 +598,7 @@ function renderScale(){
   }
   $("scale").innerHTML=out.join("");
 }
+
 function renderTimes(){
   var sp=zparts(now,src),sd=dayNum(sp),f=frac(now),i;
   $("srcname").textContent=zoneName(src);
@@ -629,38 +607,17 @@ function renderTimes(){
   $("livedot").className="dot"+(live?" live":"");
 
   if(mode==="list"){
-    var slots=rowsEl.querySelectorAll(".slot"),hit=null,selAb=(disp.length<=2),selWd=(disp.length<=3);
-    for(i=0;i<slots.length;i++){
-      var st=parseInt(slots[i].getAttribute("data-t"),10);
-      var on=(now>=st&&now<st+STEP);
-      slots[i].className=slots[i].className.replace(" sel","")+(on?" sel":"");
-      var cl=slots[i].querySelectorAll(".vcell"),j,c;
-      for(j=0;j<cl.length;j++){
-        c=cl[j];
-        if(on){
-          /* time then zone on the left, weekday pushed to the right edge */
-          c.innerHTML='<span class="sgrp">'
-            +(selWd?'<span class="sw">'+c.getAttribute("data-wd")+'</span>':"")
-            +'<span class="st">'+c.getAttribute("data-full")+'</span>'
-            +(selAb?'<span class="sz">'+c.getAttribute("data-ab")+'</span>':"")
-            +'</span>';
-        }else{
-          var mk=c.getAttribute("data-mark");
-          c.innerHTML='<span class="sgrp"><span class="st">'+c.getAttribute("data-base")+'</span></span>'
-            +(mk?'<span class="dm">'+mk+'</span>':"");
-        }
-      }
-      if(on)hit=slots[i];
-    }
-    var vh=$("vhead");
-    if(vh)vh.style.top=(f*100)+"%";
-    var g=$("vgrid");
-    if(g&&hit){
-      var top=hit.offsetTop,bot=top+hit.offsetHeight;
-      if(!listScrolled||top<g.scrollTop+24||bot>g.scrollTop+g.clientHeight-24){
-        g.scrollTop=top-g.clientHeight/2+hit.offsetHeight;
-        listScrolled=true;
-      }
+    var vp=$("vplay");
+    if(vp)vp.style.top=(f*100)+"%";
+    var cols=rowsEl.querySelectorAll(".vcol"),j;
+    for(j=0;j<cols.length&&j<disp.length;j++){
+      var ztz=disp[j],zp=zparts(now,ztz);
+      var el=cols[j].querySelector(".vtime"),ab=cols[j].querySelector(".vab");
+      /* Weekday sits with the abbreviation, where the smaller type leaves room
+         at four columns; the time keeps its own line at full size. */
+      if(ab)ab.innerHTML='<b>'+zp.wd.toUpperCase()+'</b> \u00B7 '+abbr(now,ztz)
+        +((cities.indexOf(ztz)===-1)?' \u00B7 HERE':"");
+      if(el)el.innerHTML='<span class="st">'+clock(zp)+'</span>';
     }
     return;
   }
