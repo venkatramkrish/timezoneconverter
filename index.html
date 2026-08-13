@@ -369,16 +369,20 @@ function cat(p){
 }
 
 /* ---------- storage ---------- */
-function save(){try{localStorage.setItem("tb2",JSON.stringify({z:cities,n:names,h:h12,a:acct,s:src,m:mode,st:STEPMIN}));}catch(e){}}
+function save(){try{localStorage.setItem("tb2",JSON.stringify({z:cities,n:names,h:h12,a:acct,s:src,m:mode,st:STEPMIN,hd:hidden}));}catch(e){}}
 function load(){try{var s=localStorage.getItem("tb2");return s?JSON.parse(s):null;}catch(e){return null;}}
 
 /* ---------- state ---------- */
-var cities=["Asia/Kolkata","America/New_York"];
-var names={"Asia/Kolkata":"India","America/New_York":"New York"};
+/* Filled in at boot from the device's own zone - see firstRun(). India is a
+   preset like any other, not a built-in default. */
+var cities=["UTC"];
+var names={};
 var h12=true,acct="WORK",dur=30,mode="bands",listScrolled=false;
+var hidden=[];             /* device zones the user has deliberately dismissed */
 var ld=load();
 if(ld&&ld.z&&ld.z.length){cities=ld.z;names=ld.n||names;h12=ld.h!==false;acct=ld.a||"WORK";mode=(ld.m==="list")?"list":"bands";
-  if(ld.st===15||ld.st===30||ld.st===60){STEPMIN=ld.st;STEP=STEPMIN*60000;}}
+  if(ld.st===15||ld.st===30||ld.st===60){STEPMIN=ld.st;STEP=STEPMIN*60000;}
+  if(ld.hd&&ld.hd.length)hidden=ld.hd;}
 var src=(ld&&ld.s&&cities.indexOf(ld.s)!==-1)?ld.s:cities[0];
 var now=Math.round(Date.now()/STEP)*STEP;
 var live=true,win={s:0,e:0},pickIndex=-1;
@@ -467,14 +471,22 @@ function sameZone(a,b){
 }
 function zoneName(tz){
   if(names[tz])return names[tz];
-  for(var i=0;i<CITY_DATA.length;i++){if(CITY_DATA[i][1]===tz)return CITY_DATA[i][0];}
+  var i;
+  /* PRESETS carry the zone-level label ("India" rather than "Kolkata"). */
+  for(i=0;i<PRESETS.length;i++){if(PRESETS[i][1]===tz)return PRESETS[i][0];}
+  for(i=0;i<CITY_DATA.length;i++){if(CITY_DATA[i][1]===tz)return CITY_DATA[i][0];}
   return tz.split("/").pop().replace(/_/g," ");
 }
 function displayList(){
   var h=deviceTz(),i;
   if(!h)return cities.slice();
+  if(hidden.indexOf(h)!==-1)return cities.slice();
   for(i=0;i<cities.length;i++){if(sameZone(h,cities[i]))return cities.slice();}
   return [h].concat(cities);
+}
+function hideHere(tz){
+  if(hidden.indexOf(tz)===-1)hidden.push(tz);
+  save();renderAll();
 }
 var disp=[];
 
@@ -514,9 +526,12 @@ function setAnchor(tz){
   src=tz;live=false;listScrolled=false;save();renderAll();
 }
 function removeZone(tz){
-  var out=[],j;
+  var out=[],j,dv=deviceTz();
   for(j=0;j<cities.length;j++){if(cities[j]!==tz)out.push(cities[j]);}
-  cities=out; save(); renderAll();
+  cities=out;
+  /* Dropping your own zone is a deliberate act - don't re-add it as "Here". */
+  if(dv&&sameZone(dv,tz)&&hidden.indexOf(dv)===-1)hidden.push(dv);
+  save(); renderAll();
 }
 
 function renderBands(){
@@ -531,13 +546,13 @@ function renderBands(){
         +(here?'<span class="herebadge">HERE</span>':'<button class="chg" aria-label="Change zone">\u25BE</button>')
         +'<span class="stamp"></span></div>'
         +'<div class="band">'+bandSVG(tz)+'<div class="head"></div></div>';
-      if(!here&&cities.length>1)h+='<button class="kill">&times;</button>';
+      if(here||cities.length>1)h+='<button class="kill">&times;</button>';
       row.innerHTML=h;
       row.querySelector(".rowhead").onclick=function(){setAnchor(tz);};
       var ch=row.querySelector(".chg");
       if(ch)ch.onclick=function(e){stop(e);openPicker(cities.indexOf(tz));};
       var k=row.querySelector(".kill");
-      if(k)k.onclick=function(e){stop(e);removeZone(tz);};
+      if(k)k.onclick=function(e){stop(e);if(here){hideHere(tz);}else{removeZone(tz);}};
       rowsEl.appendChild(row);
     })(disp[n]);
   }
@@ -556,7 +571,7 @@ function renderList(){
       +(here?'':'<button class="chg" aria-label="Change zone">\u25BE</button>')+'</div>'
       +'<div class="vab">'+abbr(now,tz)+(here?" \u00B7 HERE":"")+'</div>'
       +'<div class="vtime"></div>'
-      +(!here&&cities.length>1?'<button class="kill">&times;</button>':"")
+      +((here||cities.length>1)?'<button class="kill">&times;</button>':"")
       +'</div>';
   }
   h+='</div><div class="vstage" id="vstage">';
@@ -591,7 +606,10 @@ function renderList(){
       var ch=col.querySelector(".chg");
       if(ch)ch.onclick=function(e){stop(e);openPicker(cities.indexOf(t2));};
       var kk=col.querySelector(".kill");
-      if(kk)kk.onclick=function(e){stop(e);removeZone(t2);};
+      if(kk)kk.onclick=function(e){
+        stop(e);
+        if(cities.indexOf(t2)===-1){hideHere(t2);}else{removeZone(t2);}
+      };
     })(cols[i]);
   }
 }
@@ -753,9 +771,10 @@ function openPicker(idx){
 function choose(tz,nm){
   names[tz]=nm;
   if(pickIndex>=0){
-    var wasSrc=(cities[pickIndex]===src);
+    var wasSrc=(cities[pickIndex]===src),old=cities[pickIndex],dv=deviceTz();
     cities[pickIndex]=tz;
     if(wasSrc)src=tz;
+    if(dv&&sameZone(dv,old)&&!sameZone(dv,tz)&&hidden.indexOf(dv)===-1)hidden.push(dv);
   }else if(cities.indexOf(tz)===-1&&cities.length<MAXZ){
     cities.push(tz);
   }
@@ -906,8 +925,21 @@ function toast(m){var t=$("toast");t.textContent=m;t.className="toast show";
   setTimeout(function(){t.className="toast";},1700);}
 
 /* ---------- boot ---------- */
+function firstRun(){
+  /* Start with wherever this device is, plus one common counterpart. Both rows
+     are ordinary cities: rename, replace or remove either of them. */
+  var d0=deviceTz()||"UTC";
+  var s0=(d0==="America/New_York")?"Europe/London":"America/New_York";
+  if(d0===s0)s0="Asia/Kolkata";
+  cities=[d0,s0];
+  names={};
+  names[d0]=zoneName(d0);
+  names[s0]=zoneName(s0);
+  src=d0;
+}
 function boot(){
   rowsEl=$("rows");
+  if(!ld||!ld.z||!ld.z.length)firstRun();
   bindScrub(rowsEl);
   $("date").onchange=readDate; $("date").oninput=readDate;
   $("time").onchange=readTime;
