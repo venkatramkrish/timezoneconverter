@@ -71,6 +71,10 @@
   .city{font-family:var(--disp);font-weight:700;font-size:16px;letter-spacing:-.01em;background:none;
     border:0;padding:0 2px 0 0;color:var(--ink);cursor:pointer;text-align:left;}
   .city:after{content:" \25BE";font-size:10px;color:var(--muted)}
+  .city.here{cursor:default}
+  .city.here:after{content:""}
+  .herebadge{font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.1em;
+    color:var(--card);background:#2E9E6B;border-radius:4px;padding:2px 5px;flex:none}
   .stamp{margin-left:auto;display:flex;align-items:baseline;gap:6px;white-space:nowrap;
     background:none;border:0;padding:0;cursor:pointer}
   .t{font-family:var(--mono);font-size:15px;font-weight:600;letter-spacing:-.02em;color:var(--ink)}
@@ -366,33 +370,72 @@ function bandSVG(tz){
 function $(i){return document.getElementById(i);}
 var rowsEl;
 
+/* Browsers still report legacy zone names (Safari says Asia/Calcutta), so
+   canonicalise before comparing or labelling. */
+var ALIAS={"Asia/Calcutta":"Asia/Kolkata","Asia/Katmandu":"Asia/Kathmandu",
+"Asia/Saigon":"Asia/Ho_Chi_Minh","Asia/Rangoon":"Asia/Yangon",
+"America/Buenos_Aires":"America/Argentina/Buenos_Aires","Europe/Kiev":"Europe/Kyiv",
+"Asia/Istanbul":"Europe/Istanbul","US/Eastern":"America/New_York",
+"US/Central":"America/Chicago","US/Mountain":"America/Denver",
+"US/Pacific":"America/Los_Angeles","Etc/UTC":"UTC","Etc/GMT":"UTC"};
+function canon(tz){return ALIAS[tz]||tz;}
+function deviceTz(){
+  try{return canon(Intl.DateTimeFormat().resolvedOptions().timeZone||"");}catch(e){return "";}
+}
+/* Backstop for aliases not in the table: two zones that agree on their offset
+   now and at both solstices are the same clock for our purposes. */
+function sameZone(a,b){
+  if(a===b)return true;
+  var yr=new Date(now).getUTCFullYear();
+  return offset(now,a)===offset(now,b)
+    && offset(Date.UTC(yr,0,15),a)===offset(Date.UTC(yr,0,15),b)
+    && offset(Date.UTC(yr,6,15),a)===offset(Date.UTC(yr,6,15),b);
+}
+function zoneName(tz){
+  if(names[tz])return names[tz];
+  for(var i=0;i<CITY_DATA.length;i++){if(CITY_DATA[i][1]===tz)return CITY_DATA[i][0];}
+  return tz.split("/").pop().replace(/_/g," ");
+}
+function displayList(){
+  var h=deviceTz(),i;
+  if(!h)return cities.slice();
+  for(i=0;i<cities.length;i++){if(sameZone(h,cities[i]))return cities.slice();}
+  return [h].concat(cities);
+}
+var disp=[];
+
 function renderAll(){
   setWindow();
+  disp=displayList();
+  if(disp.indexOf(src)===-1)src=disp[0];
   rowsEl.innerHTML="";
-  for(var n=0;n<cities.length;n++){
-    (function(tz,idx){
+  for(var n=0;n<disp.length;n++){
+    (function(tz){
+      var here=(cities.indexOf(tz)===-1);
       var row=document.createElement("div");
       row.className="row"+(tz===src?" src":"");
       var h='<div class="rowhead">'
         +'<button class="anchor" title="Set input zone"></button>'
-        +'<button class="city">'+names[tz]+'</button>'
+        +(here
+          ? '<span class="city here">'+zoneName(tz)+'</span><span class="herebadge">HERE</span>'
+          : '<button class="city">'+zoneName(tz)+'</button>')
         +'<button class="stamp"></button></div>'
         +'<div class="band">'+bandSVG(tz)+'<div class="head"></div></div>';
-      if(cities.length>1)h+='<button class="kill">&times;</button>';
+      if(!here&&cities.length>1)h+='<button class="kill">&times;</button>';
       row.innerHTML=h;
-      row.querySelector(".city").onclick=function(){openPicker(idx);};
+      var nameEl=row.querySelector("button.city");
+      if(nameEl)nameEl.onclick=function(){openPicker(cities.indexOf(tz));};
       row.querySelector(".anchor").onclick=function(){src=tz;live=false;save();renderAll();};
       row.querySelector(".stamp").onclick=function(){src=tz;live=false;save();renderAll();};
       var k=row.querySelector(".kill");
       if(k)k.onclick=function(){
         var out=[],j;
-        for(j=0;j<cities.length;j++){if(j!==idx)out.push(cities[j]);}
-        cities=out; if(cities.indexOf(src)===-1)src=cities[0];
-        save();renderAll();
+        for(j=0;j<cities.length;j++){if(cities[j]!==tz)out.push(cities[j]);}
+        cities=out; save();renderAll();
       };
       bindDrag(row.querySelector(".band"));
       rowsEl.appendChild(row);
-    })(cities[n],n);
+    })(disp[n]);
   }
   $("add").style.display=cities.length<6?"block":"none";
   renderScale();renderTimes();
@@ -407,12 +450,12 @@ function renderScale(){
 }
 function renderTimes(){
   var sp=zparts(now,src),sd=dayNum(sp),f=frac(now),i;
-  $("srcname").textContent=names[src];
+  $("srcname").textContent=zoneName(src);
   $("date").value=sp.y+"-"+pad(sp.mo)+"-"+pad(sp.d);
   $("time").value=pad(sp.h)+":"+pad(sp.mi);
   $("livedot").className="dot"+(live?" live":"");
-  for(i=0;i<cities.length;i++){
-    var tz=cities[i],row=rowsEl.children[i],p=zparts(now,tz),dd=dayNum(p)-sd;
+  for(i=0;i<disp.length;i++){
+    var tz=disp[i],row=rowsEl.children[i],p=zparts(now,tz),dd=dayNum(p)-sd;
     row.querySelector(".stamp").innerHTML=
       '<span class="wk">'+p.wd+'</span><span class="t">'+clock(p)+'</span>'
       +'<span class="z">'+abbr(now,tz)+'</span>'
@@ -512,9 +555,9 @@ function icsStamp(ms){var d=new Date(ms);
   return ""+d.getUTCFullYear()+pad(d.getUTCMonth()+1)+pad(d.getUTCDate())+"T"+pad(d.getUTCHours())+pad(d.getUTCMinutes())+"00Z";}
 function zoneLines(){
   var out=[],i;
-  for(i=0;i<cities.length;i++){
-    var p=zparts(now,cities[i]);
-    out.push(names[cities[i]]+": "+p.wd+" "+p.d+" "+MO[p.mo-1]+", "+clock(p)+" "+abbr(now,cities[i]));
+  for(i=0;i<disp.length;i++){
+    var p=zparts(now,disp[i]);
+    out.push(zoneName(disp[i])+": "+p.wd+" "+p.d+" "+MO[p.mo-1]+", "+clock(p)+" "+abbr(now,disp[i]));
   }
   return out;
 }
@@ -529,19 +572,27 @@ function outlookURL(){
   if(to)u+="&to="+encodeURIComponent(to);
   return u;
 }
-/* Outlook mobile app scheme. It has no timeZone parameter and interprets a
-   naive timestamp as UTC, so send UTC wall-clock (no trailing Z: the scheme
-   parses the bare form reliably). */
+/* Outlook's mobile app and its desktop client disagree about bare timestamps:
+   Outlook for iOS/Android reads them as UTC, desktop Outlook reads them as
+   local. Neither accepts a timezone parameter, so pick the format per platform. */
+var IS_MOBILE=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent||"");
 function utcWall(ms){
   var d=new Date(ms);
   return d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1)+"-"+pad(d.getUTCDate())
     +"T"+pad(d.getUTCHours())+":"+pad(d.getUTCMinutes())+":00";
 }
+function deviceWall(ms){
+  var tz="UTC";
+  try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC";}catch(e){}
+  var p=zparts(ms,tz);
+  return p.y+"-"+pad(p.mo)+"-"+pad(p.d)+"T"+pad(p.h)+":"+pad(p.mi)+":00";
+}
+function appWall(ms){return IS_MOBILE?utcWall(ms):deviceWall(ms);}
 function outlookAppURL(){
   var to=$("mto").value.replace(/\s+/g,"");
   var u="ms-outlook://events/new?title="+encodeURIComponent($("mtitle").value||"Meeting")
-    +"&start="+encodeURIComponent(utcWall(now))
-    +"&end="+encodeURIComponent(utcWall(now+dur*60000));
+    +"&start="+encodeURIComponent(appWall(now))
+    +"&end="+encodeURIComponent(appWall(now+dur*60000));
   if(to)u+="&attendees="+encodeURIComponent(to);
   return u;
 }
@@ -598,6 +649,11 @@ function boot(){
   }
   $("sched").onclick=function(){$("whenbox").textContent=zoneLines().join("\n");$("compose").className="sheet open";};
   $("goapp").onclick=openOutlookApp;
+  if(!IS_MOBILE){
+    $("goapp").textContent="OPEN OUTLOOK DESKTOP";
+    $("goapp").className="btn";
+    $("goout").className="btn solid";
+  }
   $("goout").onclick=function(){window.open(outlookURL(),"_blank");};
   $("dlics").onclick=function(){
     try{
@@ -612,7 +668,12 @@ function boot(){
       navigator.clipboard.writeText(txt).then(function(){toast("Copied");},function(){toast("Copy blocked");});
     }else{toast("Copy blocked");}
   };
-  setInterval(function(){if(live)setInstant(Date.now(),true);},20000);
+  var lastTz=deviceTz();
+  setInterval(function(){
+    var t=deviceTz();
+    if(t!==lastTz){lastTz=t;renderAll();return;}
+    if(live)setInstant(Date.now(),true);
+  },20000);
   setNet();
   window.addEventListener("online",setNet);
   window.addEventListener("offline",setNet);
