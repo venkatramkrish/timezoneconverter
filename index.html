@@ -529,19 +529,19 @@ function outlookURL(){
   if(to)u+="&to="+encodeURIComponent(to);
   return u;
 }
-/* Outlook mobile app scheme. Times are wall-clock in the phone's own zone,
-   since the app has no timeZone parameter. */
-function localWall(ms){
-  var tz="UTC";
-  try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC";}catch(e){}
-  var p=zparts(ms,tz);
-  return p.y+"-"+pad(p.mo)+"-"+pad(p.d)+"T"+pad(p.h)+":"+pad(p.mi)+":00";
+/* Outlook mobile app scheme. It has no timeZone parameter and interprets a
+   naive timestamp as UTC, so send UTC wall-clock (no trailing Z: the scheme
+   parses the bare form reliably). */
+function utcWall(ms){
+  var d=new Date(ms);
+  return d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1)+"-"+pad(d.getUTCDate())
+    +"T"+pad(d.getUTCHours())+":"+pad(d.getUTCMinutes())+":00";
 }
 function outlookAppURL(){
   var to=$("mto").value.replace(/\s+/g,"");
   var u="ms-outlook://events/new?title="+encodeURIComponent($("mtitle").value||"Meeting")
-    +"&start="+encodeURIComponent(localWall(now))
-    +"&end="+encodeURIComponent(localWall(now+dur*60000));
+    +"&start="+encodeURIComponent(utcWall(now))
+    +"&end="+encodeURIComponent(utcWall(now+dur*60000));
   if(to)u+="&attendees="+encodeURIComponent(to);
   return u;
 }
