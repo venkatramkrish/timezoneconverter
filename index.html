@@ -252,8 +252,15 @@
 <div class="toast" id="toast"></div>
 
 <script>
-window.onerror=function(m,s,l,c){var e=document.getElementById("crash");
-  if(e){e.style.display="block";e.textContent="Error: "+m+" (line "+l+":"+c+")";}return false;};
+window.onerror=function(m,s,l,c){
+  var e=document.getElementById("crash");
+  if(e){
+    e.style.display="block";
+    e.textContent="Error: "+m+" (line "+l+":"+c+")  \u2014 tap to dismiss";
+    e.onclick=function(){e.style.display="none";};
+  }
+  return false;
+};
 
 /* ---------- presets ---------- */
 var PRESETS=[
@@ -319,6 +326,7 @@ function fmtr(tz){
   return _f[tz];
 }
 function zparts(ms,tz){
+  if(!isFinite(ms))ms=Date.now();          /* last-resort guard */
   var a=fmtr(tz).formatToParts(new Date(ms)),p={},i;
   for(i=0;i<a.length;i++){p[a[i].type]=a[i].value;}
   var h=parseInt(p.hour,10); if(isNaN(h)||h===24)h=0;
@@ -530,7 +538,6 @@ function renderBands(){
       if(ch)ch.onclick=function(e){stop(e);openPicker(cities.indexOf(tz));};
       var k=row.querySelector(".kill");
       if(k)k.onclick=function(e){stop(e);removeZone(tz);};
-      bindDrag(row.querySelector(".band"));
       rowsEl.appendChild(row);
     })(disp[n]);
   }
@@ -575,7 +582,6 @@ function renderList(){
   }
   h+='<div class="vplay" id="vplay"></div></div>';
   rowsEl.innerHTML=h;
-  bindDragV($("vstage"));
 
   var cols=rowsEl.querySelectorAll(".vcol");
   for(i=0;i<cols.length;i++){
@@ -634,53 +640,87 @@ function renderTimes(){
 
 /* ---------- interaction ---------- */
 function setInstant(t,keepLive){
+  if(typeof t!=="number"||!isFinite(t))return;   /* isFinite(null) is true */
   if(!keepLive)live=false;
   if(t>=win.s&&t<win.e){now=t;snapNow();renderTimes();}
   else{now=t;renderAll();}
 }
-function bindDrag(el){
-  var on=false;
-  function at(x0){
-    var r=el.getBoundingClientRect(),x=x0-r.left;
-    if(x<0)x=0; if(x>r.width)x=r.width;
-    setInstant(win.s+(x/r.width)*(win.e-win.s));
+function hasCls(el,c){
+  if(!el||!el.className)return false;
+  if(el.classList&&el.classList.contains)return el.classList.contains(c);
+  return (" "+el.className+" ").indexOf(" "+c+" ")>-1;
+}
+
+/* One scrubber for both views, bound once to a container that is never
+   replaced. Re-rendering swaps the bands underneath, so anything bound to a
+   band itself would be detached the moment a drag crosses midnight - which is
+   exactly what used to break. Movement is measured as a delta from where the
+   finger went down, so it keeps going across as many days as you drag. */
+function bindScrub(container){
+  var on=false,vert=false,start=0,startT=0,size=0,span=0;
+
+  function surface(target){
+    if(mode==="list"){
+      var st=document.getElementById("vstage");
+      return (st&&st.contains(target))?st:null;
+    }
+    var n=target;
+    while(n&&n!==container){
+      if(hasCls(n,"band"))return n;
+      n=n.parentNode;
+    }
+    return null;
   }
+  function begin(target,x,y){
+    var el=surface(target);
+    if(!el)return false;
+    var r=el.getBoundingClientRect();
+    vert=(mode==="list");
+    size=vert?r.height:r.width;
+    if(!size)return false;
+    span=win.e-win.s;
+    var pos=vert?(y-r.top):(x-r.left);
+    if(pos<0)pos=0; if(pos>size)pos=size;
+    setInstant(win.s+(pos/size)*span);   /* tap jumps to that point */
+    start=vert?y:x;
+    startT=now;                          /* after snapping */
+    return true;
+  }
+  function moveTo(x,y){
+    if(!on||!size)return;
+    var d=(vert?y:x)-start;
+    setInstant(startT+(d/size)*span);    /* relative, so it rolls into the next day */
+  }
+
   if(window.PointerEvent){
-    el.addEventListener("pointerdown",function(e){on=true;try{el.setPointerCapture(e.pointerId);}catch(x){}at(e.clientX);e.preventDefault();});
-    el.addEventListener("pointermove",function(e){if(on)at(e.clientX);});
-    el.addEventListener("pointerup",function(){on=false;});
-    el.addEventListener("pointercancel",function(){on=false;});
+    container.addEventListener("pointerdown",function(e){
+      if(!begin(e.target,e.clientX,e.clientY))return;
+      on=true;
+      try{container.setPointerCapture(e.pointerId);}catch(x){}
+      e.preventDefault();
+    });
+    container.addEventListener("pointermove",function(e){if(on)moveTo(e.clientX,e.clientY);});
+    container.addEventListener("pointerup",function(){on=false;});
+    container.addEventListener("pointercancel",function(){on=false;});
   }else{
-    el.addEventListener("touchstart",function(e){on=true;at(e.touches[0].clientX);e.preventDefault();},{passive:false});
-    el.addEventListener("touchmove",function(e){if(on)at(e.touches[0].clientX);e.preventDefault();},{passive:false});
-    el.addEventListener("touchend",function(){on=false;});
-    el.addEventListener("mousedown",function(e){on=true;at(e.clientX);});
-    window.addEventListener("mousemove",function(e){if(on)at(e.clientX);});
+    container.addEventListener("touchstart",function(e){
+      var t=e.touches[0];
+      if(!begin(e.target,t.clientX,t.clientY))return;
+      on=true;e.preventDefault();
+    },{passive:false});
+    container.addEventListener("touchmove",function(e){
+      if(!on)return;
+      var t=e.touches[0];moveTo(t.clientX,t.clientY);e.preventDefault();
+    },{passive:false});
+    container.addEventListener("touchend",function(){on=false;});
+    container.addEventListener("mousedown",function(e){
+      if(begin(e.target,e.clientX,e.clientY))on=true;
+    });
+    window.addEventListener("mousemove",function(e){if(on)moveTo(e.clientX,e.clientY);});
     window.addEventListener("mouseup",function(){on=false;});
   }
 }
-function bindDragV(el){
-  if(!el)return;
-  var on=false;
-  function at(clientY){
-    var r=el.getBoundingClientRect(),y=clientY-r.top;
-    if(y<0)y=0; if(y>r.height)y=r.height;
-    setInstant(win.s+(y/r.height)*(win.e-win.s));
-  }
-  if(window.PointerEvent){
-    el.addEventListener("pointerdown",function(e){on=true;try{el.setPointerCapture(e.pointerId);}catch(x){}at(e.clientY);e.preventDefault();});
-    el.addEventListener("pointermove",function(e){if(on)at(e.clientY);});
-    el.addEventListener("pointerup",function(){on=false;});
-    el.addEventListener("pointercancel",function(){on=false;});
-  }else{
-    el.addEventListener("touchstart",function(e){on=true;at(e.touches[0].clientY);e.preventDefault();},{passive:false});
-    el.addEventListener("touchmove",function(e){if(on)at(e.touches[0].clientY);e.preventDefault();},{passive:false});
-    el.addEventListener("touchend",function(){on=false;});
-    el.addEventListener("mousedown",function(e){on=true;at(e.clientY);});
-    window.addEventListener("mousemove",function(e){if(on)at(e.clientY);});
-    window.addEventListener("mouseup",function(){on=false;});
-  }
-}
+
 function readDate(){
   var dv=$("date").value;
   if(!dv)return;
@@ -799,14 +839,23 @@ function outlookAppURL(){
   var u="ms-outlook://events/new?title="+encodeURIComponent($("mtitle").value||"Meeting")
     +"&start="+encodeURIComponent(appWall(now))
     +"&end="+encodeURIComponent(appWall(now+dur*60000))
-    /* The scheme is undocumented and the notes field has no agreed name, so
-       send both spellings; whichever it ignores costs nothing. */
+    /* The scheme is undocumented and the notes field has no agreed name.
+       Outlook appears to ignore all of these; the clipboard fallback in
+       openOutlookApp() is what actually gets the text into the invite. */
     +"&body="+encodeURIComponent(body)
-    +"&notes="+encodeURIComponent(body);
+    +"&notes="+encodeURIComponent(body)
+    +"&description="+encodeURIComponent(body);
   if(to)u+="&attendees="+encodeURIComponent(to);
   return u;
 }
 function openOutlookApp(){
+  /* Outlook's app scheme drops the notes field, so put the zone breakdown on
+     the clipboard on the way out - one paste into the invite body. */
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(zoneLines().join("\n"));
+    }
+  }catch(e){}
   var t0=Date.now(),left=false;
   function mark(){left=true;}
   document.addEventListener("visibilitychange",mark);
@@ -836,12 +885,22 @@ function googleURL(){
   if(to)u+="&add="+encodeURIComponent(to);
   return u;
 }
+function icsFold(line){
+  /* RFC 5545: no content line over 75 octets; continuations start with a space. */
+  if(line.length<=74)return line;
+  var out=line.slice(0,74),rest=line.slice(74);
+  while(rest.length>73){out+="\r\n "+rest.slice(0,73);rest=rest.slice(73);}
+  return out+"\r\n "+rest;
+}
 function makeICS(){
-  return ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Timeband//EN","CALSCALE:GREGORIAN","METHOD:PUBLISH",
+  var lines=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Timeband//EN","CALSCALE:GREGORIAN","METHOD:PUBLISH",
     "BEGIN:VEVENT","UID:tb"+now+"@timeband","DTSTAMP:"+icsStamp(Date.now()),
     "DTSTART:"+icsStamp(now),"DTEND:"+icsStamp(now+dur*60000),
     "SUMMARY:"+($("mtitle").value||"Meeting"),
-    "DESCRIPTION:"+zoneLines().join("\\n"),"END:VEVENT","END:VCALENDAR"].join("\r\n");
+    "DESCRIPTION:"+zoneLines().join("\\n"),"END:VEVENT","END:VCALENDAR"];
+  var out=[],i;
+  for(i=0;i<lines.length;i++)out.push(icsFold(lines[i]));
+  return out.join("\r\n");
 }
 function toast(m){var t=$("toast");t.textContent=m;t.className="toast show";
   setTimeout(function(){t.className="toast";},1700);}
@@ -849,6 +908,7 @@ function toast(m){var t=$("toast");t.textContent=m;t.className="toast show";
 /* ---------- boot ---------- */
 function boot(){
   rowsEl=$("rows");
+  bindScrub(rowsEl);
   $("date").onchange=readDate; $("date").oninput=readDate;
   $("time").onchange=readTime;
   $("nminus").onclick=function(){setInstant(now-STEP);};
